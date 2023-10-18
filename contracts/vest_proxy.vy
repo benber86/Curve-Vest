@@ -8,9 +8,13 @@
 from vyper.interfaces import ERC20
 
 interface VestingEscrowSimple:
-    def vestedOf(_recipient: address) -> uint256: view
-    def balanceOf(_recipient: address) -> uint256: view
     def claim(addr: address = msg.sender): payable
+    def start_time() -> uint256: view
+    def end_time() -> uint256: view
+    def disabled_at(arg0: address) -> uint256: view
+    def total_claimed(arg0: address) -> uint256: view
+    def initial_locked(arg0: address) -> uint256: view
+
 
 event ApplyOwnership:
     admin: address
@@ -53,6 +57,17 @@ def set_operator(_op: address):
 	self.operator = _op
 
 
+@internal
+@view
+def _total_vested_of(_contract: address, _time: uint256 = block.timestamp) -> uint256:
+    start: uint256 = VestingEscrowSimple(_contract).start_time()
+    end: uint256 = VestingEscrowSimple(_contract).end_time()
+    locked: uint256 = VestingEscrowSimple(_contract).initial_locked(self)
+    if _time < start:
+        return 0
+    return min(locked * (_time - start) / (end - start), locked)
+
+
 @external
 @nonreentrant('lock')
 def claim(_contract: address):
@@ -63,7 +78,12 @@ def claim(_contract: address):
 
 	assert msg.sender == self.operator # dev: operator only
 
-	claimable: uint256 = VestingEscrowSimple(_contract).balanceOf(self)
+	t: uint256 = VestingEscrowSimple(_contract).disabled_at(self)
+	if t == 0:
+		t = block.timestamp
+	claimed: uint256 = VestingEscrowSimple(_contract).total_claimed(self)
+	claimable: uint256 = self._total_vested_of(_contract, t) - claimed
+	claimed += claimable
 
 	VestingEscrowSimple(_contract).claim()
 
