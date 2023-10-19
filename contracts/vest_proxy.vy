@@ -57,19 +57,23 @@ def __init__(_admin: address, _operator: address, _token: address):
 
 @external
 @nonreentrant("lock")
-def claim(_contract: address, _recipient: address = msg.sender):
+def claim(_contract: address, _recipient: address = msg.sender) -> uint256:
     """
     @notice Claim vested funds from vest contract to the operator
     @param _contract address of the vest contract
     @param _recipient address that will receive the vested tokens
+    @return amount claimed
     """
 
     assert msg.sender == self.operator  # dev: operator only
     VestingEscrowSimple(_contract).claim()
     claimed: uint256 = ERC20(self.token).balanceOf(self)
-    assert ERC20(self.token).transfer(_recipient, claimed)
+    assert ERC20(self.token).transfer(
+        _recipient, claimed, default_return_value=True
+    )  # dev: transfer failed
 
     log Claim(_contract, _recipient, claimed)
+    return claimed
 
 
 @external
@@ -87,7 +91,9 @@ def rescue_token(
     """
     assert msg.sender == self.operator  # dev: operator only
     assert _recipient != ZERO_ADDRESS  # dev: transfers to 0x0 are not allowed
-    assert ERC20(_erc20).transfer(_recipient, _amount)
+    assert ERC20(_erc20).transfer(
+        _recipient, _amount, default_return_value=True
+    )  # dev: transfer failed
     log RescueToken(_recipient, _amount)
 
     return True
@@ -111,7 +117,7 @@ def commit_transfer_ownership(addr: address) -> bool:
     @param addr Address to have ownership transferred to
     """
     assert msg.sender == self.admin  # dev: admin only
-    assert addr != empty(address)  # dev : can't set to zero address
+    assert addr != empty(address)  # dev: cannot set to 0x0
     self.future_admin = addr
     log CommitOwnership(addr)
 
@@ -123,7 +129,7 @@ def accept_transfer_ownership() -> bool:
     """
     @notice Accept pending ownership transfer
     """
-    assert msg.sender == self.future_admin  # dev: admin only
+    assert msg.sender == self.future_admin  # dev: future admin only
     _admin: address = self.future_admin
     self.admin = _admin
     log ApplyOwnership(_admin)
