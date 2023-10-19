@@ -8,12 +8,12 @@
 from vyper.interfaces import ERC20
 
 interface VestingEscrowSimple:
-    def claim(addr: address = msg.sender): payable
-    def start_time() -> uint256: view
-    def end_time() -> uint256: view
-    def disabled_at(arg0: address) -> uint256: view
-    def total_claimed(arg0: address) -> uint256: view
-    def initial_locked(arg0: address) -> uint256: view
+	def claim(addr: address = msg.sender): payable
+	def start_time() -> uint256: view
+	def end_time() -> uint256: view
+	def disabled_at(arg0: address) -> uint256: view
+	def total_claimed(arg0: address) -> uint256: view
+	def initial_locked(arg0: address) -> uint256: view
 
 
 event Claim:
@@ -32,7 +32,7 @@ event CommitOwnership:
 	admin: address
 
 event ApplyOwnership:
-    admin: address
+	admin: address
 
 
 admin: public(address)
@@ -58,12 +58,12 @@ def __init__(_admin: address, _operator: address, _token: address):
 @internal
 @view
 def _total_vested_of(_contract: address, _time: uint256 = block.timestamp) -> uint256:   
-    start: uint256 = VestingEscrowSimple(_contract).start_time()
-    end: uint256 = VestingEscrowSimple(_contract).end_time()
-    locked: uint256 = VestingEscrowSimple(_contract).initial_locked(self)
-    if _time < start:
-        return 0
-    return min(locked * (_time - start) / (end - start), locked)
+	start: uint256 = VestingEscrowSimple(_contract).start_time()
+	end: uint256 = VestingEscrowSimple(_contract).end_time()
+	locked: uint256 = VestingEscrowSimple(_contract).initial_locked(self)
+	if _time < start:
+		return 0
+	return min(locked * (_time - start) / (end - start), locked)
 
 
 @external
@@ -88,27 +88,27 @@ def claim(_contract: address):
 @external
 def rescue_token(_to: address, _value: uint256, _erc20: address ) -> bool:
     """
-    @notice Transfer `_value` tokens from `self` to `_to`
-    @dev Vyper does not allow underflows, so the subtraction in
-         this function will revert on an insufficient balance
-    @param _to The address to transfer to
-    @param _value The amount to be transferred
-    @param _erc20 The token address to transfer
-    @return bool success
-    """
-    assert msg.sender == self.operator # dev: operator only
-    assert _to != ZERO_ADDRESS  # dev: transfers to 0x0 are not allowed   
-    assert ERC20(_erc20).transfer(_to, _value)
-    log RescueToken(_to, _value)
-    
-    return True
+	@notice Transfer `_value` tokens from `self` to `_to`
+	@dev Vyper does not allow underflows, so the subtraction in
+	     this function will revert on an insufficient balance
+	@param _to The address to transfer to
+	@param _value The amount to be transferred
+	@param _erc20 The token address to transfer
+	@return bool success
+	"""
+	assert msg.sender == self.operator # dev: operator only
+	assert _to != ZERO_ADDRESS  # dev: transfers to 0x0 are not allowed   
+	assert ERC20(_erc20).transfer(_to, _value)
+	log RescueToken(_to, _value)
+
+	return True
 
 
 @external
 def set_operator(_op: address):
 	"""
 	@notice Set the contract operator
-    @param _op Address set as the operator
+	@param _op Address set as the operator
 	"""
 	assert msg.sender == self.admin # dev: admin only	
 	self.operator = _op
@@ -118,33 +118,25 @@ def set_operator(_op: address):
 @external
 def commit_transfer_ownership(addr: address) -> bool:
     """
-    @notice Transfer ownership of VestProxy to 'addr'
-    @param addr Address to have ownership transferred to
-    """
-    assert msg.sender == self.admin  # dev: admin only   
-    self.future_admin = addr
-    log CommitOwnership(addr)
+	@notice Transfer ownership of VestProxy to 'addr'
+	@param addr Address to have ownership transferred to
+	"""
+	assert msg.sender == self.admin  # dev: admin only   
+	self.future_admin = addr
+	log CommitOwnership(addr)
 
-    return True
+	return True
 
 
 @external
 def apply_transfer_ownership() -> bool:
-    """
-    @notice Apply pending ownership transfer
-    """
-    assert msg.sender == self.admin  # dev: admin only
-    _admin: address = self.future_admin
-    assert _admin != ZERO_ADDRESS  # dev: admin not set
-    self.admin = _admin
-    log ApplyOwnership(_admin)
+	"""
+	@notice Apply pending ownership transfer
+	"""
+	assert msg.sender == self.admin  # dev: admin only
+	_admin: address = self.future_admin
+	assert _admin != ZERO_ADDRESS  # dev: admin not set
+	self.admin = _admin
+	log ApplyOwnership(_admin)
 
-    return True
-
-
-
-
-
-
-
-    
+	return True
