@@ -2,7 +2,7 @@
 """
 @title Vest Proxy
 @author Llama Risk
-@notice Extends functionality of Curve community fund vests
+@notice Proxy contract that extends functionality of VestingEscrowSimple
 """
 
 from vyper.interfaces import ERC20
@@ -16,21 +16,30 @@ interface VestingEscrowSimple:
     def initial_locked(arg0: address) -> uint256: view
 
 
-event ApplyOwnership:
-    admin: address
+event Claim:
+	contract: address
+	recipient: address
+	claimed: uint256
+
+event RescueToken:
+	to: address
+	value: uint256
+
+event SetOperator:
+	operator: address
 
 event CommitOwnership:
 	admin: address
 
-event Claim:
-	contract: address
-	operator: address
-	claimable: uint256
+event ApplyOwnership:
+    admin: address
+
 
 admin: public(address)
 future_admin: public(address)
 operator: public(address)
 token: public(address)
+balanceOf: public(HashMap[address, uint256])
 
 
 @external
@@ -46,20 +55,9 @@ def __init__(_admin: address, _operator: address, _token: address):
 	self.token = _token
 
 
-@external
-def set_operator(_op: address):
-	"""
-	@notice Set the contract operator
-    @param _op Address set as the operator
-	"""
-
-	assert msg.sender == self.admin # dev: admin only
-	self.operator = _op
-
-
 @internal
 @view
-def _total_vested_of(_contract: address, _time: uint256 = block.timestamp) -> uint256:
+def _total_vested_of(_contract: address, _time: uint256 = block.timestamp) -> uint256:   
     start: uint256 = VestingEscrowSimple(_contract).start_time()
     end: uint256 = VestingEscrowSimple(_contract).end_time()
     locked: uint256 = VestingEscrowSimple(_contract).initial_locked(self)
@@ -75,21 +73,46 @@ def claim(_contract: address):
 	@notice Claim vested funds from vest contract to the operator
 	@param _contract address of the vest contract
 	"""
-
 	assert msg.sender == self.operator # dev: operator only
-
 	t: uint256 = VestingEscrowSimple(_contract).disabled_at(self)
 	if t == 0:
 		t = block.timestamp
 	claimed: uint256 = VestingEscrowSimple(_contract).total_claimed(self)
 	claimable: uint256 = self._total_vested_of(_contract, t) - claimed
 	claimed += claimable
-
 	VestingEscrowSimple(_contract).claim()
-
-	assert ERC20(self.token).transfer(self.operator, claimable)
-	
+	assert ERC20(self.token).transfer(self.operator, claimable)	
 	log Claim(_contract, self.operator, claimable)
+
+
+@external
+def rescue_token(_to: address, _value: uint256, _erc20: address ) -> bool:
+    """
+    @notice Transfer `_value` tokens from `self` to `_to`
+    @dev Vyper does not allow underflows, so the subtraction in
+         this function will revert on an insufficient balance
+    @param _to The address to transfer to
+    @param _value The amount to be transferred
+    @param _erc20 The token address to transfer
+    @return bool success
+    """
+    assert msg.sender == self.operator # dev: operator only
+    assert _to != ZERO_ADDRESS  # dev: transfers to 0x0 are not allowed   
+    assert ERC20(_erc20).transfer(_to, _value)
+    log RescueToken(_to, _value)
+    
+    return True
+
+
+@external
+def set_operator(_op: address):
+	"""
+	@notice Set the contract operator
+    @param _op Address set as the operator
+	"""
+	assert msg.sender == self.admin # dev: admin only	
+	self.operator = _op
+	log SetOperator(_op)
 
 
 @external
@@ -98,7 +121,7 @@ def commit_transfer_ownership(addr: address) -> bool:
     @notice Transfer ownership of VestProxy to 'addr'
     @param addr Address to have ownership transferred to
     """
-    assert msg.sender == self.admin  # dev: admin only
+    assert msg.sender == self.admin  # dev: admin only   
     self.future_admin = addr
     log CommitOwnership(addr)
 
