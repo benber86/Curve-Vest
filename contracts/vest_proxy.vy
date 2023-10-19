@@ -34,12 +34,20 @@ event CommitOwnership:
 event ApplyOwnership:
 	admin: address
 
+event Revoked:
+	operator: address
+
+event ClawBack:
+	contract: address
+	recipient: address
+	retrieved: uint256
 
 admin: public(address)
 future_admin: public(address)
 operator: public(address)
 token: public(address)
 balanceOf: public(HashMap[address, uint256])
+revoked_at: public(uint256)
 
 
 @external
@@ -68,11 +76,14 @@ def _total_vested_of(_contract: address, _time: uint256 = block.timestamp) -> ui
 
 @external
 @nonreentrant('lock')
-def claim(_contract: address):
+def claim(_contract: address, _recipient: address = msg.sender):
 	"""
 	@notice Claim vested funds from vest contract to the operator
 	@param _contract address of the vest contract
+	@param _recipient address that will receive the vested tokens
 	"""
+
+	assert self.revoked_at == 0
 	assert msg.sender == self.operator # dev: operator only
 	t: uint256 = VestingEscrowSimple(_contract).disabled_at(self)
 	if t == 0:
@@ -81,8 +92,38 @@ def claim(_contract: address):
 	claimable: uint256 = self._total_vested_of(_contract, t) - claimed
 	claimed += claimable
 	VestingEscrowSimple(_contract).claim()
-	assert ERC20(self.token).transfer(self.operator, claimable)	
-	log Claim(_contract, self.operator, claimable)
+
+	assert ERC20(self.token).transfer(_recipient, claimable)
+	
+	log Claim(_contract, _recipient, claimable)
+
+
+@external
+def revoke():
+	"""
+	@notice Revokes the vesting contract, operation is final
+	"""
+	assert self.revoked_at == 0
+	self.revoked_at = block.timestamp
+	self.operator = empty(address)
+
+	log Revoked(operator)
+
+
+@external
+def claw_back(_contract: address, _recipient: address):
+	"""
+	@notice Retrieve vested funds after the stream has been revoked
+	@param _contract address of the vest contract
+	@param _recipient address that will receive the funds
+	"""
+	assert self.revoked_at != 0
+	assert msg.sender == self.admin
+	VestingEscrowSimple(_contract).claim()
+	retrieved: uint256 = ERC20(self.token).balanceOf(self)
+	assert ERC20(self.token).transfer(_recipient, retrieved)
+
+	log ClawBack(_contract, _recipient, retrieved)
 
 
 @external
@@ -110,6 +151,7 @@ def set_operator(_op: address):
 	@notice Set the contract operator
 	@param _op Address set as the operator
 	"""
+	assert self.revoked_at == 0
 	assert msg.sender == self.admin # dev: admin only	
 	self.operator = _op
 	log SetOperator(_op)
