@@ -21,9 +21,11 @@ def test_transfer_ownership(fn_isolation, voting_escrow_proxy, admin, alice):
     assert voting_escrow_proxy.admin() == admin
 
     with brownie.reverts():
-        voting_escrow_proxy.apply_transfer_ownership({"from": alice})  # not admin yet
+        voting_escrow_proxy.accept_transfer_ownership(
+            {"from": admin}
+        )  # not future admin
 
-    voting_escrow_proxy.apply_transfer_ownership({"from": admin})
+    voting_escrow_proxy.accept_transfer_ownership({"from": alice})
     assert voting_escrow_proxy.admin() == alice
 
 
@@ -32,4 +34,6 @@ def test_no_transfer_to_zero_address(
 ):
     assert voting_escrow_proxy.admin() == admin
     with brownie.reverts():
-        voting_escrow_proxy.apply_transfer_ownership({"from": admin})
+        voting_escrow_proxy.commit_transfer_ownership(
+            brownie.ZERO_ADDRESS, {"from": admin}
+        )
