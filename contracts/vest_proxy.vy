@@ -90,7 +90,7 @@ def rescue_token(
     @return bool success
     """
     assert msg.sender == self.operator  # dev: operator only
-    assert _recipient != ZERO_ADDRESS  # dev: transfers to 0x0 are not allowed
+    assert _recipient != empty(address)  # dev: transfers to 0x0 are not allowed
     assert ERC20(_erc20).transfer(
         _recipient, _amount, default_return_value=True
     )  # dev: transfer failed
