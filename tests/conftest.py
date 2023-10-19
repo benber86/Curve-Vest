@@ -37,7 +37,7 @@ def owner(accounts):
 
 @pytest.fixture(scope="session")
 def operator(accounts):
-    yield accounts[10]
+    yield accounts[9]
 
 
 @pytest.fixture(scope="session")
