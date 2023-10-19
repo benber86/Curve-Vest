@@ -29,3 +29,22 @@ def test_non_operator_can_not_claim(
         voting_escrow_proxy.claim(vesting_contract, {"from": alice})
     with brownie.reverts():
         voting_escrow_proxy.claim(vesting_contract, {"from": admin})
+
+
+def test_claw_back_flow(
+    fn_isolation, vesting_contract, curve_token, voting_escrow_proxy, admin, operator
+):
+    chain.sleep(3600 * 24 * 7)
+    chain.mine(1)
+    voting_escrow_proxy.set_operator(admin, {"from": admin})
+    with brownie.reverts():
+        voting_escrow_proxy.claim(vesting_contract, {"from": operator})
+    admin_previous_balance = curve_token.balanceOf(admin)
+    claimable = vesting_contract.balanceOf(voting_escrow_proxy)
+    assert claimable > 0
+    voting_escrow_proxy.claim(vesting_contract, {"from": admin})
+    assert approx(
+        curve_token.balanceOf(admin),
+        claimable + admin_previous_balance,
+        precision=1e-3,
+    )
