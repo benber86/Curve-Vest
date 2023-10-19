@@ -5,6 +5,8 @@ name = "pypi"
 
 [packages]
 titanoboa = "*"
+eth-abi = "*"
+eth-brownie = "*"
 
 [dev-packages]
 
